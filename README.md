@@ -41,7 +41,7 @@ python drowsiness_detector_with_posture.py
 ## Author
 
 **Aniket Kadam**  
-SPIT, Pune (SPPU)
+SITS, Pune (SPPU)
 
 ---
 
