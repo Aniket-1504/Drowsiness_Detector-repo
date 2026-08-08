@@ -1,13 +1,3 @@
 {
-	"folders": [
-		{
-			"path": ".vscode"
-		},
-		{
-			"path": "Drowsiness_Detector-repo"
-		},
-		{
-			"path": "venv"
-		}
-	]
+	"terminal.integrated.defaultProfile.windows":"PowerShell"
 }

@@ -23,6 +23,7 @@ import urllib.request
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
+import numpy as np
 import pygame
 
 # ---------------------------------------------------------
@@ -35,7 +36,7 @@ MODEL_URL = (
 )
 
 EYE_BLINK_THRESHOLD = 0.5     # blendshape score above this = eye considered closed
-EYE_CLOSED_SECONDS = 2.0      # how long eyes must stay closed to trigger alert
+EYE_CLOSED_SECONDS = 0.1      # how long eyes must stay closed to trigger alert
 
 MOUTH_OPEN_THRESHOLD = 0.5    # blendshape score above this = mouth wide open
 YAWN_SECONDS = 1.5            # how long mouth must stay open to count as a yawn
@@ -44,6 +45,29 @@ YAWN_SECONDS = 1.5            # how long mouth must stay open to count as a yawn
 ALARM_FILE = "alarm.mp3"      # put your alarm sound file here, same folder as script
 ALERT_COOLDOWN_SECONDS = 4.0  # min gap between repeated alarm sounds
 LOG_FILE = "alert_log.csv"    # every triggered alert gets a row here
+
+# --- Beep fallback (used automatically if ALARM_FILE is missing) ---
+BEEP_FREQ_HZ = 1000            # tone pitch
+BEEP_DURATION_SECONDS = 0.6    # tone length
+
+
+def make_beep_sound(freq_hz=BEEP_FREQ_HZ, duration_s=BEEP_DURATION_SECONDS,
+                     sample_rate=44100, volume=0.5):
+    """Generate a simple sine-wave beep as a pygame Sound object (no file needed)."""
+    n_samples = int(sample_rate * duration_s)
+    t = np.linspace(0, duration_s, n_samples, endpoint=False)
+    wave = np.sin(2 * np.pi * freq_hz * t)
+
+    # short fade in/out to avoid clicks at start/end
+    fade_len = int(sample_rate * 0.02)
+    if fade_len > 0:
+        fade = np.linspace(0, 1, fade_len)
+        wave[:fade_len] *= fade
+        wave[-fade_len:] *= fade[::-1]
+
+    wave = (wave * volume * 32767).astype(np.int16)
+    stereo_wave = np.column_stack([wave, wave])  # duplicate to 2 channels
+    return pygame.sndarray.make_sound(np.ascontiguousarray(stereo_wave))
 
 
 # ---------------------------------------------------------
@@ -76,16 +100,23 @@ class AlertManager:
         self.last_alert_time = {}  # per alert type, e.g. "drowsiness", "yawn"
 
         self.sound_loaded = False
+        self.use_file = False
+        self.beep_sound = None
         try:
             pygame.mixer.init()
             if os.path.exists(sound_path):
                 pygame.mixer.music.load(sound_path)
                 pygame.mixer.music.set_volume(1.0)
                 self.sound_loaded = True
+                self.use_file = True
                 print(f"Alarm sound loaded successfully: {sound_path}")
             else:
+                # Fall back to a generated beep tone so alerts still have sound
+                self.beep_sound = make_beep_sound()
+                self.sound_loaded = True
+                self.use_file = False
                 print(f"WARNING: '{sound_path}' not found. "
-                      f"Add your alarm file with this name to hear alerts.")
+                      f"Using a generated beep tone instead.")
         except Exception as e:
             print(f"WARNING: Audio unavailable ({e}). Alerts will still be "
                   f"shown on screen and logged, just without sound.")
@@ -106,7 +137,10 @@ class AlertManager:
 
             if self.sound_loaded:
                 try:
-                    pygame.mixer.music.play()
+                    if self.use_file:
+                        pygame.mixer.music.play()
+                    else:
+                        self.beep_sound.play()
                     print(f"[AUDIO] Playing alarm for: {alert_type}")
                 except Exception as e:
                     print(f"[AUDIO ERROR] Could not play sound: {e}")
