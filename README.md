@@ -14,9 +14,8 @@ pip install mediapipe opencv-python pygame numpy
 python drowsiness_detector_with_posture.py
 ```
 ## Usage
-1. (Optional) Place `alarm.mp3` in the project folder — if it's missing, the system automatically generates a beep tone instead
-2. Run the script
-3. Press 'q' to quit
+1. Run the script
+2. Press 'q' to quit
 ## Output
 `alert_log.csv` — Contains timestamp, alert type, and details for each incident
 ## How It Works
